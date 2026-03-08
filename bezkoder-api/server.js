@@ -9,30 +9,41 @@ var corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-// parse requests of content-type - application/json
 app.use(express.json());
-
-// parse requests of content-type - application/x-www-form-urlencoded
 app.use(express.urlencoded({ extended: true }));
 
 const db = require("./app/models");
 
-db.sequelize.sync();
-// // drop the table if it already exists
-// db.sequelize.sync({ force: true }).then(() => {
-//   console.log("Drop and re-sync db.");
-// });
-
-// simple route
 app.get("/", (req, res) => {
   res.json({ message: "Welcome to bezkoder application." });
 });
 
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ ok: true });
+});
+
+app.get("/api/health/db", async (req, res) => {
+  try {
+    await db.sequelize.authenticate();
+    res.status(200).json({ ok: true, db: "up" });
+  } catch (err) {
+    res.status(503).json({ ok: false, db: "down", error: err.message });
+  }
+});
+
 require("./app/routes/turorial.routes")(app);
 
-// set port, listen for requests
 const PORT = process.env.NODE_DOCKER_PORT || 8080;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}.`);
-});
+
+db.sequelize
+  .sync()
+  .then(() => {
+    console.log("Synced db.");
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}.`);
+    });
+  })
+  .catch((err) => {
+    console.error("Failed to sync db:", err);
+    process.exit(1);
+  });
